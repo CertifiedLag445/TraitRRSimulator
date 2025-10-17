@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trait Roller</title> 
+  <style>
+    :root {
+      --primary: #2a2d3e;
+      --secondary: #1f2133;
+      --accent: #6d5acd;
+      --text: #ffffff;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; font-family: Arial, sans-serif; }
+    body { background-color: var(--secondary); color: var(--text); min-height:100vh; display:flex; padding:2rem; }
+    .container { display:flex; gap:2rem; max-width:1200px; margin:0 auto; width:100%; }
+    .main-content { flex:1; background:var(--primary); padding:2rem; border-radius:1rem; box-shadow:0 4px 6px rgba(0,0,0,.1); }
+    .sidebar { width:300px; background:var(--primary); padding:2rem; border-radius:1rem; box-shadow:0 4px 6px rgba(0,0,0,.1); }
+
+    .trait-display { font-size:2rem; text-align:center; margin:2rem 0; min-height:120px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:1rem; }
+    .trait-display img { width:100px; height:100px; display:block; margin:0 auto; }
+    .trait { opacity:0; transform:scale(.9); transition:all .3s ease; }
+    .trait.active { opacity:1; transform:scale(1); font-weight:bold; text-shadow:0 0 10px rgba(109,90,205,.5); }
+
+    .controls { display:flex; flex-direction:column; gap:1rem; }
+    button { background:var(--accent); color:var(--text); border:none; padding:1rem; border-radius:.5rem; cursor:pointer; transition:all .2s ease; font-size:1rem; }
+    button:hover { transform:translateY(-2px); box-shadow:0 4px 6px rgba(0,0,0,.2); }
+    select { background:var(--primary); color:var(--text); border:1px solid var(--accent); padding:.5rem; border-radius:.5rem; margin-top:.5rem; }
+
+    .trait-list { list-style:none; padding:0; }
+    .trait-list li { margin-bottom:.5rem; display:flex; align-items:center; justify-content:space-between; }
+    .trait-list li img { width:30px; height:30px; margin-right:.5rem; }
+    .trait-list .trait-info { display:flex; align-items:center; gap:10px; }
+
+    .counter { text-align:center; margin-top:2rem; font-size:1.2rem; }
+
+    .reroll-until-container { margin-top:1rem; display:flex; flex-direction:column; gap:.5rem; }
+
+    .double-icon { color:var(--accent); margin-right:10px; font-size:1.2em; }
+    .double-trait-item { margin-top:10px !important; padding-top:10px !important; border-top:1px solid var(--accent); color:var(--text); opacity:.9; transition:all .3s ease; }
+    .double-trait-item:hover { opacity:1; }
+    .double-trait-item .double-icon { color:var(--accent); font-size:1.2em; margin-right:8px; display:inline-block; }
+    .double-trait-item span { color:var(--accent); }
+
+    .progress-container { margin-top:1rem; padding:1rem; background:var(--secondary); border-radius:.5rem; }
+    .progress-bar { height:4px; background:var(--accent); width:0%; transition:width .3s ease; border-radius:2px; }
+    .progress-text { margin-bottom:.5rem; font-size:.9rem; color:var(--text); }
+
+    
+    #pityPanel { margin-top: 1rem; }
+    #pityItems > div { background: var(--secondary); border: 1px solid var(--accent); border-radius: .5rem; padding: .75rem; }
+  
+
+#rarePopupRoot {
+  position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  display: grid; place-items: center;
+}
+
+.rare-popup {
+  position: relative; display: grid; place-items: center;
+  opacity: 0; transform: scale(1.6);
+  animation: popup-enter 1200ms cubic-bezier(.22,.9,.2,1) forwards;
+  filter: drop-shadow(0 0 20px rgba(255,255,255,.35));
+}
+
+.rare-popup img {
+  width: 220px; height: 220px; image-rendering: crisp-edges;
+}
+
+
+.rare-popup.mythic::before {
+  content: ""; position: absolute; inset: -30%;
+  background: radial-gradient(circle, rgba(255,255,255,.18), rgba(109,90,205,.08) 40%, transparent 60%);
+  filter: blur(8px); border-radius: 50%;
+  animation: mythic-glow 1300ms ease-in-out infinite alternate;
+}
+
+.rare-popup .rays {
+  position: absolute; inset: -25%;
+  background:
+    conic-gradient(from 0deg, rgba(255,255,255,.15), rgba(255,255,255,0) 40% 60%, rgba(255,255,255,.15));
+  -webkit-mask: radial-gradient(circle, transparent 45%, #000 46%);
+  mask: radial-gradient(circle, transparent 45%, #000 46%);
+  border-radius: 50%;
+  animation: rays-rotate 1600ms linear infinite;
+}
+
+
+.rare-popup.ultra { filter: drop-shadow(0 0 26px rgba(255,255,255,.6)); }
+.rare-popup.ultra::after {
+  content: ""; position: absolute; width: 360px; height: 360px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.18);
+  animation: ring-burst 900ms ease-out forwards;
+}
+
+
+.sparkles {
+  position: absolute; inset: 0; overflow: visible;
+}
+.sparkle {
+  position: absolute; width: 6px; height: 6px; border-radius: 50%;
+  background: #fff; opacity: .9;
+  animation: sparkle-fly 900ms ease-out forwards;
+}
+
+
+@keyframes popup-enter {
+  0%   { opacity: 0; transform: scale(1.9); }
+  12%  { opacity: 1; transform: scale(1.75); }
+  60%  { opacity: 1; transform: scale(1.0); }
+  100% { opacity: 0; transform: scale(0.55); }
+}
+
+@keyframes mythic-glow {
+  from { transform: scale(1); opacity: .7; }
+  to   { transform: scale(1.1); opacity: .95; }
+}
+
+@keyframes rays-rotate {
+  from { transform: rotate(0deg) scale(1.05); }
+  to   { transform: rotate(360deg) scale(1.05); }
+}
+
+@keyframes ring-burst {
+  0%   { transform: scale(.6); opacity: 0; }
+  40%  { transform: scale(1);  opacity: .9; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+@keyframes sparkle-fly {
+  0%   { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(.6); opacity: 0; }
+}
+
+
+
+.roll-locked body { pointer-events: none; }
+.roll-locked #rarePopupRoot { pointer-events: none; } 
+
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="main-content">
+
+      
+      <div style="display:flex; gap:1rem; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h1 style="font-size:1.1rem; font-weight:700;">Trait Roller</h1>
+        <label style="display:flex; align-items:center; gap:.5rem;">
+          <span>Game:</span>
+          <select id="gameSelect" onchange="setGame(this.value)">
+            <option value="AA — Anime Adventures">AA — Anime Adventures</option>
+            <option value="AV — Anime Vanguards">AV — Anime Vanguards</option>
+          </select>
+        </label>
+      </div>
+
+     
+      <div id="pityPanel" style="display:none;">
+        <h3 style="margin-bottom:.5rem;">Pity (AV — Anime Vanguards)</h3>
+        <div id="pityItems" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem;"></div>
+      </div>
+
+      <div class="trait-display">
+        <div class="trait">Click Reroll to begin!</div>
+      </div>
+
+      <div class="counter">Rerolls: 0</div>
+
+      <div class="controls">
+        <button onclick="reroll()">Reroll</button>
+        <button onclick="reset()">Reset</button>
+
+        <div class="reroll-until-container">
+          <select id="targetTrait">
+            <option value="">Select trait...</option>
+          </select>
+          <button onclick="rerollUntil()">Reroll Until</button>
+          <button id="btnRollUntilAnyDouble" onclick="rollUntilAnyDouble()">Roll Until Double</button>
+        </div>
+
+        
+        <div class="reroll-until-container">
+          <select id="targetTrait1">
+            <option value="">Select first trait...</option>
+          </select>
+          <select id="targetTrait2">
+            <option value="">Select second trait...</option>
+          </select>
+          <button id="btnRerollUntilDouble" onclick="rerollUntilDouble()">Reroll Until Double</button>
+        </div>
+      </div>
+
+      <div class="progress-container" style="display:none;">
+        <div class="progress-text">Attempting rerolls: <span id="progress-count">0</span></div>
+        <div class="progress-bar"></div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <h2>Trait Chances</h2>
+      <ul class="trait-list" id="sidebarList"></ul>
+    </div>
+  </div>
+
+  <script>
+    
+    const games = {
+      'AA — Anime Adventures': {
+        supportsDouble: true,
+        doubleChance: 0.2, // %
+        pity: null,
+        traits: {
+          'Superior': { chance: 29.97, levels: [1, 2, 3] },
+          'Nimble':   { chance: 24.98, levels: [1, 2, 3] },
+          'Range':    { chance: 24.98, levels: [1, 2, 3] },
+          'Adept':    { chance: 9.99,  levels: [] },
+          'Culling':  { chance: 5.00,  levels: [] },
+          'Sniper':   { chance: 2.50,  levels: [] },
+          'Godspeed': { chance: 1.00,  levels: [] },
+          'Reaper':   { chance: 0.80,  levels: [] },
+          'Celestial':{ chance: 0.36,  levels: [] },
+          'Divine':   { chance: 0.20,  levels: [] },
+          'Golden':   { chance: 0.15,  levels: [] },
+          'Unique':   { chance: 0.10,  levels: [] }
+        },
+        images: {
+          'Superior': '../PortfolioImages/Trait_Superior.png',
+          'Nimble':   '../PortfolioImages/Trait_Nimble.png',
+          'Range':    '../PortfolioImages/Trait_Range.png',
+          'Adept':    '../PortfolioImages/Trait_Adept.png',
+          'Culling':  '../PortfolioImages/Trait_Culling.png',
+          'Sniper':   '../PortfolioImages/Trait_Sniper.png',
+          'Godspeed': '../PortfolioImages/Trait_Godspeed.png',
+          'Reaper':   '../PortfolioImages/Trait_Reaper.png',
+          'Celestial':'../PortfolioImages/Trait_Celestial.png',
+          'Divine':   '../PortfolioImages/Trait_Divine.png',
+          'Golden':   '../PortfolioImages/Trait_Golden.png',
+          'Unique':   '../PortfolioImages/Trait_Unique.png',
+          'Double':   '../PortfolioImages/Trait_Double.png'
+        }
+      },
+
+      
+      'AV — Anime Vanguards': {
+        supportsDouble: false,
+        doubleChance: 0,
+        pity: { Solar: 300, Deadeye: 400, Ethereal: 858, Monarch: 1500 },
+        traits: {
+          Range:    { chance: 26.0,  levels: [1, 2, 3] },
+          Swift:    { chance: 26.0,  levels: [1, 2, 3] },
+          Vigor:    { chance: 26.0,  levels: [1, 2, 3] },
+          Scholar:  { chance: 10.0,  levels: [] },
+          Marksman: { chance: 6.5,   levels: [] },
+          Fortune:  { chance: 2.5,   levels: [] },
+          Blitz:    { chance: 1.85,  levels: [] },
+          Solar:    { chance: 0.5,   levels: [] },
+          Deadeye:  { chance: 0.375, levels: [] },
+          Ethereal: { chance: 0.175, levels: [] },
+          Monarch:  { chance: 0.1,   levels: [] }
+        },
+        images: {
+          Range:    '../PortfolioImages/RangeAV.png',
+          Swift:    '../PortfolioImages/SwiftAV.png',
+          Vigor:    '../PortfolioImages/VigorAV.png',
+          Scholar:  '../PortfolioImages/ScholarAV.PNG', 
+          Marksman: '../PortfolioImages/MarksmanAV.png',
+          Fortune:  '../PortfolioImages/FortuneAV.png',
+          Blitz:    '../PortfolioImages/BlitzAV.png',
+          Solar:    '../PortfolioImages/SolarAV.png',
+          Deadeye:  '../PortfolioImages/DeadeyeAV.png',
+          Ethereal: '../PortfolioImages/EtherealAV.png',
+          Monarch:  '../PortfolioImages/MonarchAV.png'
+        }
+      }
+    };
+
+    
+    let currentGameKey = 'AA — Anime Adventures';
+    let rerollCount = 0;
+
+    const traitDisplay = document.querySelector('.trait');
+    const counter      = document.querySelector('.counter');
+    const sidebarList  = document.getElementById('sidebarList');
+    const pityPanel    = document.getElementById('pityPanel');
+    const pityItemsBox = document.getElementById('pityItems');
+    const gameSelect   = document.getElementById('gameSelect');
+
+    const dropdowns = [
+      document.getElementById('targetTrait'),
+      document.getElementById('targetTrait1'),
+      document.getElementById('targetTrait2')
+    ];
+
+    function getCurrent(){ return games[currentGameKey]; }
+
+    
+    function populateDropdowns() {
+      const { traits } = getCurrent();
+      const names = Object.keys(traits);
+
+      dropdowns.forEach(dd => {
+        if (!dd) return;
+        dd.innerHTML = (dd.id === 'targetTrait')
+          ? '<option value="">Select trait...</option>'
+          : '<option value=""></option>';
+
+        names.forEach(name => {
+          const data = traits[name];
+          if (data.levels?.length) {
+            data.levels.forEach(level => {
+              const opt = document.createElement('option');
+              opt.value = `${name} ${level}`;
+              opt.textContent = `${name} ${level}`;
+              dd.appendChild(opt);
+            });
+          } else {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            dd.appendChild(opt);
+          }
+        });
+      });
+    }
+
+    function populateSidebar() {
+      const { traits, images, doubleChance, supportsDouble } = getCurrent();
+      sidebarList.innerHTML = '';
+
+      Object.entries(traits)
+        .sort(([,a],[,b]) => b.chance - a.chance)
+        .forEach(([trait, data]) => {
+          const li = document.createElement('li');
+
+          const info = document.createElement('div');
+          info.className = 'trait-info';
+
+          const img = document.createElement('img');
+          img.src = images[trait] || '';
+          img.alt = trait;
+          info.appendChild(img);
+
+          const text = document.createElement('span');
+          text.textContent = data.levels?.length ? `${trait} ${data.levels.join(',')}` : trait;
+          info.appendChild(text);
+
+          const chance = document.createElement('span');
+          chance.textContent = (data.chance ?? 0) + '%';
+
+          li.appendChild(info);
+          li.appendChild(chance);
+          sidebarList.appendChild(li);
+        });
+
+     
+      if (supportsDouble) {
+        const doubleLi = document.createElement('li');
+        doubleLi.className = 'double-trait-item';
+        const info = document.createElement('div'); info.className = 'trait-info';
+        const x2 = document.createElement('span'); x2.className = 'double-icon'; x2.textContent = '×2';
+        const lbl = document.createElement('span'); lbl.textContent = 'Double Trait';
+        const pct = document.createElement('span'); pct.textContent = (doubleChance ?? 0) + '%';
+        info.appendChild(x2); info.appendChild(lbl);
+        doubleLi.appendChild(info); doubleLi.appendChild(pct);
+        sidebarList.appendChild(doubleLi);
+      }
+    }
+
+    function toggleDoubleUI() {
+      const { supportsDouble } = getCurrent();
+      const dblElems = [
+        document.getElementById('targetTrait1'),
+        document.getElementById('targetTrait2'),
+        document.getElementById('btnRerollUntilDouble'),
+        document.getElementById('btnRollUntilAnyDouble')
+      ];
+      dblElems.forEach(el => { if (el) el.style.display = supportsDouble ? '' : 'none'; });
+    }
+
+    
+    let pityCounters = {};
+
+    function renderPityPanel() {
+      const { pity, images } = getCurrent();
+
+      if (!pity) {
+        pityPanel.style.display = 'none';
+        pityItemsBox.innerHTML = '';
+        return;
+      }
+
+      pityPanel.style.display = '';
+      pityItemsBox.innerHTML = '';
+      pityCounters = {};
+
+      Object.entries(pity).forEach(([trait, threshold]) => {
+        pityCounters[trait] = 0;
+
+        const wrap = document.createElement('div');
+
+        const head = document.createElement('div');
+        head.style.display = 'flex';
+        head.style.alignItems = 'center';
+        head.style.justifyContent = 'space-between';
+        head.style.marginBottom = '.5rem';
+
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.style.gap = '.5rem';
+
+        const img = document.createElement('img');
+        img.src = images[trait] || '';
+        img.alt = trait;
+        img.style.width = '28px';
+        img.style.height = '28px';
+
+        const name = document.createElement('strong');
+        name.textContent = trait;
+
+        left.appendChild(img);
+        left.appendChild(name);
+
+        const right = document.createElement('span');
+        right.id = `pity-count-${trait}`;
+        right.textContent = `0 / ${threshold}`;
+
+        const barWrap = document.createElement('div');
+        barWrap.style.height = '6px';
+        barWrap.style.background = 'rgba(255,255,255,0.1)';
+        barWrap.style.borderRadius = '3px';
+
+        const bar = document.createElement('div');
+        bar.id = `pity-bar-${trait}`;
+        bar.className = 'progress-bar';
+        bar.style.height = '100%';
+        bar.style.width = '0%';
+        bar.style.borderRadius = '3px';
+
+        barWrap.appendChild(bar);
+
+        head.appendChild(left);
+        head.appendChild(right);
+        wrap.appendChild(head);
+        wrap.appendChild(barWrap);
+        pityItemsBox.appendChild(wrap);
+      });
+
+      updatePityUI();
+    }
+
+    function updatePityUI() {
+      const { pity } = getCurrent();
+      if (!pity) return;
+
+      Object.entries(pity).forEach(([trait, threshold]) => {
+        const c = pityCounters[trait] ?? 0;
+        const pct = Math.min(100, (c / threshold) * 100);
+        const countEl = document.getElementById(`pity-count-${trait}`);
+        const barEl   = document.getElementById(`pity-bar-${trait}`);
+        if (countEl) countEl.textContent = `${c} / ${threshold}`;
+        if (barEl)   barEl.style.width   = `${pct}%`;
+      });
+    }
+
+    
+    function getRegularTrait() {
+      const { traits } = getCurrent();
+      const roll = Math.random() * 100;
+      let cumulative = 0;
+
+      const sorted = Object.entries(traits).sort(([,a],[,b]) => b.chance - a.chance);
+      for (const [name, data] of sorted) {
+        cumulative += data.chance;
+        if (roll < cumulative) {
+          if (data.levels?.length) {
+            const lvl = data.levels[Math.floor(Math.random() * data.levels.length)];
+            return `${name} ${lvl}`;
+          }
+          return name;
+        }
+      }
+      return sorted[0]?.[0] || 'Unknown';
+    }
+
+    function getRandom() {
+      const g = getCurrent();
+      if (g.supportsDouble && Math.random() * 100 < (g.doubleChance || 0)) {
+        const t1 = getRegularTrait();
+        const t2 = getRegularTrait();
+        return `${t1} + ${t2}`;
+      }
+      return getRegularTrait();
+    }
+
+    function updateDisplay(result) {
+    try { window.__lastRollString = String(result); } catch(_) {}
+try {
+    if (typeof showRarePopup === 'function') {
+      if (result.includes('+')) {
+        const [t1, t2] = result.split(' + ');
+        const b1 = getBaseName(t1), b2 = getBaseName(t2);
+        const r1 = classifyRarity(b1), r2 = classifyRarity(b2);
+        if (r1 === 'ultra' || r2 === 'ultra') {
+          showRarePopup(r1 === 'ultra' ? b1 : b2);
+        } else if (r1 === 'mythic' || r2 === 'mythic') {
+          showRarePopup(r1 ? b1 : b2);
+        }
+      } else {
+        showRarePopup(getBaseName(result));
+      }
+    }
+  } catch(e) { /* no-op */ }
+
+      const { images } = getCurrent();
+      traitDisplay.classList.remove('active');
+
+      setTimeout(() => {
+        let html = '';
+        if (result.includes('+')) {
+          const [t1, t2] = result.split(' + ');
+          const b1 = t1.split(' ')[0], b2 = t2.split(' ')[0];
+          html = `
+            <div style="display:flex; gap:1rem; justify-content:center; align-items:center">
+              <img src="${images[b1] || ''}" alt="${b1}">
+              <img src="${images[b2] || ''}" alt="${b2}">
+            </div>
+            <div>${result}</div>`;
+        } else {
+          const base = result.split(' ')[0];
+          html = `<img src="${images[base] || ''}" alt="${base}"><div>${result}</div>`;
+        }
+        traitDisplay.innerHTML = html;
+        traitDisplay.classList.add('active');
+      }, 200);
+
+      counter.textContent = `Rerolls: ${rerollCount}`;
+    }
+
+    
+    function reroll() {
+  if (window.__rollLock) { return; }
+
+      const g = getCurrent();
+      rerollCount++;
+
+      
+      if (g.pity) {
+        Object.keys(g.pity).forEach(k => pityCounters[k] = (pityCounters[k] || 0) + 1);
+
+        
+        const forceOrder = ['Monarch','Ethereal','Deadeye','Solar'].filter(k => g.pity[k] != null);
+        const toForce = forceOrder.find(k => pityCounters[k] >= g.pity[k]);
+        if (toForce) {
+          updateDisplay(toForce);
+          pityCounters[toForce] = 0;  
+          updatePityUI();
+          return;
+        }
+      }
+
+      
+      const result = getRandom();
+
+      
+      if (g.pity && !result.includes('+')) {
+        const base = result.split(' ')[0];
+        if (g.pity[base] != null) pityCounters[base] = 0;
+        updatePityUI();
+      }
+
+      updateDisplay(result);
+    }
+
+    function reset() {
+      rerollCount = 0;
+      traitDisplay.textContent = 'Click Reroll to begin!';
+      counter.textContent = 'Rerolls: 0';
+      const g = getCurrent();
+      if (g.pity) {
+        Object.keys(g.pity).forEach(k => pityCounters[k] = 0);
+        updatePityUI();
+      }
+    }
+
+    async function rerollUntil() {
+  if (window.__rollLock) { return; }
+
+      const targetTrait = document.getElementById('targetTrait').value;
+      if (!targetTrait) { alert('Please select a trait'); return; }
+
+      const maxAttempts = 1_000_000;
+      let result;
+      rerollCount = 0;
+      let lastUpdate = Date.now();
+
+      try {
+        do {
+          rerollCount++;
+          result = getRandom();
+
+          
+          if (result.includes('+')) continue;
+
+          if (result === targetTrait) break;
+          if (rerollCount >= maxAttempts) { alert(`Stopped after ${maxAttempts.toLocaleString()} attempts.`); break; }
+
+          if (rerollCount % 1000 === 0 && Date.now() - lastUpdate > 100) {
+            counter.textContent = `Rerolls: ${rerollCount.toLocaleString()}`;
+            await new Promise(r => setTimeout(r, 0));
+            lastUpdate = Date.now();
+          }
+        } while (true);
+
+        updateDisplay(result);
+      } catch (e) {
+        console.error(e);
+        alert('An error occurred while rerolling.');
+        reset();
+      }
+    }
+
+    function rollUntilAnyDouble() {
+  if (window.__rollLock) { return; }
+
+      const g = getCurrent();
+      if (!g.supportsDouble) { alert('This game does not support Double traits.'); return; }
+
+      let result;
+      rerollCount = 0;
+      do {
+        rerollCount++;
+        result = getRandom();
+      } while (!result.includes('+'));
+
+      updateDisplay(result);
+    }
+
+    function rerollUntilDouble() {
+  if (window.__rollLock) { return; }
+
+      const g = getCurrent();
+      if (!g.supportsDouble) { alert('This game does not support Double traits.'); return; }
+
+      const t1 = document.getElementById('targetTrait1').value;
+      const t2 = document.getElementById('targetTrait2').value;
+      if (!t1 || !t2) { alert('Please select both traits'); return; }
+
+      let result;
+      rerollCount = 0;
+      do {
+        rerollCount++;
+        result = getRandom();
+        if (rerollCount > 1_000_000) { alert('Stopped after 1,000,000 attempts.'); break; }
+      } while (!result.includes('+') || !(result === `${t1} + ${t2}` || result === `${t2} + ${t1}`));
+
+      updateDisplay(result);
+    }
+
+    
+    function setGame(key) {
+      if (!games[key]) return;
+      currentGameKey = key;
+      gameSelect.value = key;
+
+      rerollCount = 0;
+      pityCounters = {};
+      traitDisplay.textContent = 'Click Reroll to begin!';
+      counter.textContent = 'Rerolls: 0';
+
+      populateDropdowns();
+      populateSidebar();
+      toggleDoubleUI();
+      renderPityPanel();
+    }
+
+    
+    setGame(currentGameKey);
+  
+
+function getBaseName(full) {
+  return full.includes(' + ') ? full : full.split(' ')[0];
+}
+function getChanceFor(base) {
+  const { traits } = getCurrent();
+  return (traits[base]?.chance ?? 100);
+}
+function classifyRarity(base) {
+  const ch = getChanceFor(base);
+  if (ch <= 0.10) return 'ultra';
+  if (ch <= 0.80) return 'mythic';
+  return null;
+}
+ function classifyRarity(base) {
+  const ch = getChanceFor(base);
+  if (ch <= 0.10) return 'ultra';
+  if (ch <= 0.80) return 'mythic';  
+  return null;
+}
+
+function makeSparkles(container, count = 18) {
+  for (let i = 0; i < count; i++) {
+    const s = document.createElement('div');
+    s.className = 'sparkle';
+    const r = 140 + Math.random()*100;
+    const a = Math.random() * Math.PI * 2;
+    const dx = Math.cos(a) * r;
+    const dy = Math.sin(a) * r;
+    s.style.setProperty('--dx', `${dx}px`);
+    s.style.setProperty('--dy', `${dy}px`);
+    s.style.left = '50%'; s.style.top = '50%';
+    s.style.transform = 'translate(-50%,-50%)';
+    container.appendChild(s);
+  }
+}
+function showRarePopup(base) {
+    try { if (typeof shouldSuppressRarePopup === 'function' && shouldSuppressRarePopup(base)) { return; } } catch(_) {}
+const ANIM_MS = 1300;
+  const { images } = getCurrent();
+  const rarity = classifyRarity(base);
+  if (!rarity) return;
+  window.__rollLock = true;
+  disableRollInputs(true);
+
+  const root = document.getElementById('rarePopupRoot');
+  root.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = `rare-popup ${rarity}`;
+  const rays = document.createElement('div');
+  rays.className = 'rays';
+  wrap.appendChild(rays);
+  const img = document.createElement('img');
+  img.src = images[base] || '';
+  img.alt = base;
+  wrap.appendChild(img);
+  if (rarity === 'ultra') {
+    const sp = document.createElement('div');
+    sp.className = 'sparkles';
+    makeSparkles(sp, 26);
+    wrap.appendChild(sp);
+  }
+  root.appendChild(wrap);
+  setTimeout(() => { root.innerHTML = ''; window.__rollLock = false; disableRollInputs(false); }, ANIM_MS);
+}
+
+</script>
+<div id="rarePopupRoot" aria-hidden="true"></div>
+<script>
+
+window.__rollLock = false;
+function disableRollInputs(disabled) {
+  
+  try {
+    document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]').forEach(el => {
+      el.disabled = !!disabled;
+    });
+    document.documentElement.classList.toggle('roll-locked', !!disabled);
+  } catch(_) {}
+}
+
+</script>
+<script>
+
+function __isAAContext() {
+  try {
+    const ctx = (typeof getCurrent === 'function') ? getCurrent() : null;
+    const name = (ctx && (ctx.title || ctx.name || ctx.id || ctx.key)) ? (ctx.title || ctx.name || ctx.id || ctx.key) : '';
+    if (typeof window !== 'undefined' && (window.AA_MODE || window.AnimeAdventuresMode)) return true;
+    return /anime\s*adventures/i.test(String(name));
+  } catch(_) { return false; }
+}
+function shouldSuppressRarePopup(base){ return false; }
+</script>
+</body>
+</html>
