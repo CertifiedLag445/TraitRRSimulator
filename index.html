@@ -665,7 +665,6 @@ try {
       do {
         rerollCount++;
         result = getRandom();
-        if (rerollCount > 1_000_000) { alert('Stopped after 1,000,000 attempts.'); break; }
       } while (!result.includes('+') || !(result === `${t1} + ${t2}` || result === `${t2} + ${t1}`));
 
       updateDisplay(result);
