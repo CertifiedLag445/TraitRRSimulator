@@ -140,8 +140,8 @@
 
 </style>
 </head>
-<div id="easterHotspot" style="position:fixed;left:6px;top:6px;width:24px;height:24px;opacity:0;z-index:10000;"></div>
 <body>
+  <div id="easterHotspot" style="position:fixed;left:6px;top:6px;width:24px;height:24px;opacity:0;z-index:10000;"></div>
   <div class="container">
     <div class="main-content">
 
@@ -487,20 +487,21 @@
     }
 
     function getRandom() {
-      const g = getCurrent();
-      if (g.supportsDouble && Math.random() * 100 < (g.doubleChance || 0)) {
-        const t1 = getRegularTrait();
-        const t2 = getRegularTrait();
-        return `${t1} + ${t2}`;
-      }
-      return getRegularTrait();
-    }
-  // 0.1% guarantee 
-    if (window.__forceNextTrait) {
-      const t = window.__forceNextTrait;
-      window.__forceNextTrait = null; 
-      return t; 
+  if (window.__forceNextTrait) {
+    const t = window.__forceNextTrait;
+    window.__forceNextTrait = null;
+    return t;
   }
+
+  const g = getCurrent();
+  if (g.supportsDouble && Math.random() * 100 < (g.doubleChance || 0)) {
+    const t1 = getRegularTrait();
+    const t2 = getRegularTrait();
+    return `${t1} + ${t2}`;
+  }
+  return getRegularTrait();
+}
+
 
 
     function updateDisplay(result) {
@@ -593,45 +594,34 @@ try {
       }
     }
 
-    async function rerollUntilTarget() {
+    async function rerollUntil() {
   if (window.__rollLock) return;
 
-  const targetEl = document.getElementById('targetTrait');
-  const counterEl = document.getElementById('counter');
+  const targetEl  = document.getElementById('targetTrait');
+  const counterEl = document.querySelector('.counter'); 
   const targetTrait = targetEl?.value?.trim();
   if (!targetTrait) { alert('Please select a trait'); return; }
 
   window.__rollLock = true;
-
   let result = '';
-  let rerollCount = 0;
   let lastPaint = performance.now();
-  const maxAttempts = Infinity; 
+  rerollCount = 0;
 
   try {
     for (;;) {
       rerollCount++;
-      result = getRandom();                 
+      result = getRandom();
 
-      
       if (typeof result === 'string' && result.includes('+')) continue;
-
       if (result === targetTrait) break;
 
-      
-      if (rerollCount >= maxAttempts) {
-        break;
-      }
-
-      
       const now = performance.now();
       if ((rerollCount & 0x3FF) === 0 || now - lastPaint > 120) {
         if (counterEl) counterEl.textContent = `Rerolls: ${rerollCount.toLocaleString()}`;
-        await Promise.resolve();            
+        await Promise.resolve();
         lastPaint = now;
       }
     }
-
     updateDisplay(result);
   } catch (e) {
     console.error(e);
@@ -641,6 +631,7 @@ try {
     window.__rollLock = false;
   }
 }
+
 
 
     function rollUntilAnyDouble() {
