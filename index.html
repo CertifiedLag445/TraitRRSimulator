@@ -140,6 +140,7 @@
 
 </style>
 </head>
+<div id="easterHotspot" style="position:fixed;left:6px;top:6px;width:24px;height:24px;opacity:0;z-index:10000;"></div>
 <body>
   <div class="container">
     <div class="main-content">
@@ -494,6 +495,13 @@
       }
       return getRegularTrait();
     }
+  // 0.1% guarantee 
+    if (window.__forceNextTrait) {
+      const t = window.__forceNextTrait;
+      window.__forceNextTrait = null; 
+      return t; 
+  }
+
 
     function updateDisplay(result) {
     try { window.__lastRollString = String(result); } catch(_) {}
@@ -585,42 +593,55 @@ try {
       }
     }
 
-    async function rerollUntil() {
-  if (window.__rollLock) { return; }
+    async function rerollUntilTarget() {
+  if (window.__rollLock) return;
 
-      const targetTrait = document.getElementById('targetTrait').value;
-      if (!targetTrait) { alert('Please select a trait'); return; }
+  const targetEl = document.getElementById('targetTrait');
+  const counterEl = document.getElementById('counter');
+  const targetTrait = targetEl?.value?.trim();
+  if (!targetTrait) { alert('Please select a trait'); return; }
 
-      const maxAttempts = 1_000_000;
-      let result;
-      rerollCount = 0;
-      let lastUpdate = Date.now();
+  window.__rollLock = true;
 
-      try {
-        do {
-          rerollCount++;
-          result = getRandom();
+  let result = '';
+  let rerollCount = 0;
+  let lastPaint = performance.now();
+  const maxAttempts = Infinity; 
 
-          
-          if (result.includes('+')) continue;
+  try {
+    for (;;) {
+      rerollCount++;
+      result = getRandom();                 
 
-          if (result === targetTrait) break;
-          if (rerollCount >= maxAttempts) { alert(`Stopped after ${maxAttempts.toLocaleString()} attempts.`); break; }
+      
+      if (typeof result === 'string' && result.includes('+')) continue;
 
-          if (rerollCount % 1000 === 0 && Date.now() - lastUpdate > 100) {
-            counter.textContent = `Rerolls: ${rerollCount.toLocaleString()}`;
-            await new Promise(r => setTimeout(r, 0));
-            lastUpdate = Date.now();
-          }
-        } while (true);
+      if (result === targetTrait) break;
 
-        updateDisplay(result);
-      } catch (e) {
-        console.error(e);
-        alert('An error occurred while rerolling.');
-        reset();
+      
+      if (rerollCount >= maxAttempts) {
+        break;
+      }
+
+      
+      const now = performance.now();
+      if ((rerollCount & 0x3FF) === 0 || now - lastPaint > 120) {
+        if (counterEl) counterEl.textContent = `Rerolls: ${rerollCount.toLocaleString()}`;
+        await Promise.resolve();            
+        lastPaint = now;
       }
     }
+
+    updateDisplay(result);
+  } catch (e) {
+    console.error(e);
+    alert('An error occurred while rerolling.');
+    if (typeof reset === 'function') reset();
+  } finally {
+    window.__rollLock = false;
+  }
+}
+
 
     function rollUntilAnyDouble() {
   if (window.__rollLock) { return; }
@@ -772,6 +793,14 @@ function __isAAContext() {
   } catch(_) { return false; }
 }
 function shouldSuppressRarePopup(base){ return false; }
+
+  
+window.__forceNextTrait = null;
+document.getElementById('easterHotspot')?.addEventListener('click', () => {
+  const g = getCurrent();
+  window.__forceNextTrait = (currentGameKey.startsWith('AA')) ? 'Unique' : 'Monarch';
+});
+
 </script>
 </body>
 </html>
